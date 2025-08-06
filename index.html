@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Climate Crisis Predictor</title>
+    <!-- Tailwind CSS CDN for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the application */
+        body {
+            font-family: 'Inter', sans-serif; /* Using Inter font for a clean look */
+            background-color: #f0f4f8; /* Light blue-gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh; /* Full viewport height */
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff; /* White background for the main container */
+            border-radius: 16px; /* Rounded corners for a softer look */
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+            padding: 32px;
+            max-width: 600px; /* Max width to keep content readable */
+            width: 100%;
+            text-align: center;
+        }
+        input[type="date"] {
+            padding: 12px 16px;
+            border: 1px solid #cbd5e1; /* Light gray border */
+            border-radius: 8px;
+            font-size: 1rem;
+            width: calc(100% - 32px); /* Adjust width for padding */
+            max-width: 300px; /* Limit input width */
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+        button {
+            background-image: linear-gradient(to right, #4ade80, #22c55e); /* Green gradient for a vibrant button */
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease; /* Smooth transition for hover effects */
+            box-shadow: 0 4px 10px rgba(34, 197, 94, 0.3); /* Button shadow */
+            border: none;
+        }
+        button:hover {
+            background-image: linear-gradient(to right, #22c55e, #16a34a); /* Darker green on hover */
+            box-shadow: 0 6px 15px rgba(34, 197, 94, 0.4); /* Enhanced shadow on hover */
+            transform: translateY(-2px); /* Slight lift effect on hover */
+        }
+        .result-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0; /* Separator line for results */
+        }
+        .probability-display {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #10b981; /* Emerald green for the probability percentage */
+            margin-bottom: 15px;
+        }
+        .example-list {
+            list-style: none; /* Remove default list styling */
+            padding: 0;
+            margin-top: 20px;
+            text-align: left;
+        }
+        .example-list li {
+            background-color: #f8fafc; /* Very light gray for list items */
+            border: 1px solid #e2e8f0; /* Light border for list items */
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+            color: #475569; /* Slate gray text color */
+            line-height: 1.5;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); /* Subtle shadow for list items */
+        }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #22c55e; /* Green spinner */
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite; /* Spin animation */
+            margin: 20px auto;
+            display: none; /* Hidden by default */
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error-message {
+            color: #ef4444; /* Red for error messages */
+            margin-top: 15px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">Climate Crisis Predictor</h1>
+        <p class="text-gray-600 mb-8">Enter a future date to see a hypothetical probability of a climate crisis and potential scenarios.</p>
+
+        <div class="flex flex-col items-center">
+            <label for="crisisDate" class="text-gray-700 text-lg mb-2">Select a Date:</label>
+            <input type="date" id="crisisDate">
+            <button id="calculateBtn">Calculate Crisis Risk</button>
+        </div>
+
+        <!-- Loading spinner and error message display areas -->
+        <div id="loadingSpinner" class="loading-spinner"></div>
+        <div id="errorMessage" class="error-message hidden"></div>
+
+        <!-- Results section, hidden by default -->
+        <div id="results" class="result-section hidden">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Prediction for <span id="predictedDate"></span></h2>
+            <p class="text-gray-600 text-lg mb-2">Likelihood of Climate Crisis:</p>
+            <div id="probability" class="probability-display"></div>
+
+            <h3 class="text-xl font-semibold text-gray-700 mt-8 mb-4">Potential Scenarios:</h3>
+            <ul id="examplesList" class="example-list">
+                <!-- AI-generated examples will be populated here -->
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Get references to DOM elements for easier manipulation
+        const crisisDateInput = document.getElementById('crisisDate');
+        const calculateBtn = document.getElementById('calculateBtn');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+        const resultsDiv = document.getElementById('results');
+        const predictedDateSpan = document.getElementById('predictedDate');
+        const probabilityDiv = document.getElementById('probability');
+        const examplesList = document.getElementById('examplesList');
+
+        // Set a default date to one year from the current date for user convenience
+        const today = new Date();
+        const defaultDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate());
+        crisisDateInput.valueAsDate = defaultDate;
+
+        /**
+         * Calculates a hypothetical climate crisis probability based on the target date.
+         * This is a simplified, illustrative calculation and not based on scientific models.
+         * @param {Date} targetDate The date for which to calculate the probability.
+         * @returns {number} The calculated probability percentage (0-100).
+         */
+        function calculateClimateCrisisProbability(targetDate) {
+            const currentDate = new Date();
+            // Calculate difference in years (approximate, considering leap years)
+            const diffTime = targetDate.getTime() - currentDate.getTime();
+            const diffYears = diffTime / (1000 * 60 * 60 * 24 * 365.25);
+
+            let probability = 50; // Base probability set to 50% for the current moment
+
+            if (diffYears > 0) {
+                // Increase probability for future dates: +3% per year
+                probability += diffYears * 3;
+            } else if (diffYears < 0) {
+                // Decrease probability for past dates: +1% per year (less relevant for this app's focus)
+                probability += diffYears * 1;
+            }
+
+            // Ensure probability stays within a valid range (0% to 100%)
+            probability = Math.max(0, Math.min(100, probability));
+            return probability;
+        }
+
+        /**
+         * Generates climate crisis example scenarios using the Gemini API.
+         * Includes exponential backoff for robust API calling.
+         * @param {number} probability The calculated hypothetical probability.
+         * @param {string} dateString The formatted date string (e.g., "September 21, 2033").
+         * @returns {Promise<string[]>} A promise that resolves to an array of example strings.
+         */
+        async function generateClimateCrisisExamples(probability, dateString) {
+            errorMessage.classList.add('hidden'); // Hide any previous error messages
+            loadingSpinner.style.display = 'block'; // Show the loading spinner
+            resultsDiv.classList.add('hidden'); // Hide results while new ones are loading
+
+            try {
+                // Construct the prompt for the Gemini API to request specific examples
+                const prompt = `Given a hypothetical climate crisis probability of ${probability.toFixed(2)}%, generate three distinct and specific examples of what *could* happen on ${dateString} due to climate change. These should be impactful and plausible, even if fictional for this scenario. Focus on environmental and societal impacts. Format the output as a JSON array of strings, where each string is a distinct example.`;
+
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+
+                // Define the payload for the Gemini API request, including JSON schema for structured response
+                const payload = {
+                    contents: chatHistory,
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "ARRAY",
+                            items: {
+                                type: "STRING"
+                            }
+                        }
+                    }
+                };
+
+                // API key is handled by the Canvas runtime; leave empty for local development if you're not using Canvas.
+                // If running locally outside Canvas, you would replace "" with your actual Gemini API key.
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                // Implement exponential backoff for API calls to handle rate limits or transient errors
+                let response;
+                let retries = 0;
+                const maxRetries = 5;
+                const baseDelay = 1000; // Initial delay of 1 second
+
+                while (retries < maxRetries) {
+                    try {
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (response.ok) {
+                            break; // If response is OK, exit retry loop
+                        } else if (response.status === 429) {
+                            // Handle Too Many Requests (rate limiting)
+                            const delay = baseDelay * Math.pow(2, retries) + Math.random() * 1000; // Exponential backoff with jitter
+                            console.warn(`Rate limit hit. Retrying in ${delay / 1000}s...`);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            retries++;
+                        } else {
+                            // For other HTTP errors, parse and throw
+                            const errorData = await response.json();
+                            throw new Error(`API Error: ${response.status} - ${errorData.error.message}`);
+                        }
+                    } catch (fetchError) {
+                        if (retries === maxRetries - 1) {
+                            throw fetchError; // Re-throw if max retries reached
+                        }
+                        const delay = baseDelay * Math.pow(2, retries) + Math.random() * 1000;
+                        console.error(`Fetch error: ${fetchError.message}. Retrying in ${delay / 1000}s...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        retries++;
+                    }
+                }
+
+                // If no successful response after retries, throw an error
+                if (!response || !response.ok) {
+                    throw new Error("Failed to get a successful response after multiple retries.");
+                }
+
+                const result = await response.json();
+
+                // Parse the JSON response from the API
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const jsonString = result.candidates[0].content.parts[0].text;
+                    const parsedJson = JSON.parse(jsonString);
+                    return parsedJson;
+                } else {
+                    throw new Error("Unexpected API response structure or no content.");
+                }
+            } catch (error) {
+                console.error("Error generating examples:", error);
+                errorMessage.classList.remove('hidden');
+                errorMessage.textContent = `Error: ${error.message}. Please try again.`;
+                return []; // Return an empty array on error to prevent further issues
+            } finally {
+                loadingSpinner.style.display = 'none'; // Hide the spinner regardless of success or failure
+            }
+        }
+
+        // Event listener for the "Calculate Crisis Risk" button click
+        calculateBtn.addEventListener('click', async () => {
+            const selectedDate = crisisDateInput.valueAsDate;
+
+            // Validate if a date has been selected
+            if (!selectedDate) {
+                errorMessage.classList.remove('hidden');
+                errorMessage.textContent = "Please select a valid date.";
+                resultsDiv.classList.add('hidden');
+                return;
+            }
+
+            // Format the selected date for display and for the API prompt
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            const formattedDate = selectedDate.toLocaleDateString(undefined, options);
+
+            predictedDateSpan.textContent = formattedDate;
+
+            // Calculate the hypothetical probability
+            const probability = calculateClimateCrisisProbability(selectedDate);
+            probabilityDiv.textContent = `${probability.toFixed(2)}%`;
+
+            // Generate the example scenarios using the AI
+            const examples = await generateClimateCrisisExamples(probability, formattedDate);
+
+            // Clear any previously displayed examples
+            examplesList.innerHTML = '';
+
+            // Populate the list with the newly generated examples
+            if (examples.length > 0) {
+                examples.forEach(example => {
+                    const listItem = document.createElement('li');
+                    listItem.textContent = example;
+                    examplesList.appendChild(listItem);
+                });
+                resultsDiv.classList.remove('hidden'); // Show the results section
+            } else {
+                // If no examples were generated, display an error message
+                errorMessage.classList.remove('hidden');
+                errorMessage.textContent = "Could not generate examples. Please try again or check your input.";
+                resultsDiv.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
