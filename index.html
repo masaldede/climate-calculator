@@ -181,10 +181,20 @@
          * @param {string} dateString The formatted date string (e.g., "September 21, 2033").
          * @returns {Promise<string[]>} A promise that resolves to an array of example strings.
          */
+        function buildFallbackExamples(probability, dateString) {
+            const severity = probability >= 75 ? 'severe' : probability >= 40 ? 'moderate' : 'emerging';
+            return [
+                `Coastal cities report ${severity} tidal flooding near ${dateString}, disrupting transit and forcing temporary evacuations of low-lying neighborhoods.`,
+                `Regional power grids issue conservation alerts as heatwaves trigger record electricity demand, prompting ${severity} emergency measures.`,
+                `Local governments coordinate ${severity} drought relief efforts after prolonged rainfall shortages strain food and water supplies.`
+            ];
+        }
+
         async function generateClimateCrisisExamples(probability, dateString) {
             errorMessage.classList.add('hidden'); // Hide any previous error messages
             loadingSpinner.style.display = 'block'; // Show the loading spinner
             resultsDiv.classList.add('hidden'); // Hide results while new ones are loading
+            calculateBtn.disabled = true;
 
             try {
                 // Construct the prompt for the Gemini API to request specific examples
@@ -210,6 +220,12 @@
                 // API key is handled by the Canvas runtime; leave empty for local development if you're not using Canvas.
                 // If running locally outside Canvas, you would replace "" with your actual Gemini API key.
                 const apiKey = "";
+
+                if (!apiKey) {
+                    console.warn("No Gemini API key provided. Using fallback examples.");
+                    return buildFallbackExamples(probability, dateString);
+                }
+
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
                 // Implement exponential backoff for API calls to handle rate limits or transient errors
@@ -270,10 +286,11 @@
             } catch (error) {
                 console.error("Error generating examples:", error);
                 errorMessage.classList.remove('hidden');
-                errorMessage.textContent = `Error: ${error.message}. Please try again.`;
-                return []; // Return an empty array on error to prevent further issues
+                errorMessage.textContent = `Error: ${error.message}. Showing fallback scenarios.`;
+                return buildFallbackExamples(probability, dateString); // Return fallback content on error
             } finally {
                 loadingSpinner.style.display = 'none'; // Hide the spinner regardless of success or failure
+                calculateBtn.disabled = false;
             }
         }
 
@@ -297,7 +314,7 @@
 
             // Calculate the hypothetical probability
             const probability = calculateClimateCrisisProbability(selectedDate);
-            probabilityDiv.textContent = `${probability.toFixed(2)}%`;
+            probabilityDiv.textContent = `${probability.toFixed(1)}%`;
 
             // Generate the example scenarios using the AI
             const examples = await generateClimateCrisisExamples(probability, formattedDate);
